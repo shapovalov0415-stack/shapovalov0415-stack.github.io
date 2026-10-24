@@ -1,0 +1,7 @@
+# Agent skills installed with the Skills CLI (https://skills.sh).
+# Only skills-lock.json is tracked; restore the skill files with:
+#   npx skills experimental_install
+# Keeping the vendored copy out of the repository also keeps it out of the
+# GitHub Pages publication surface, which serves this repository root.
+/.agents/
+/.claude/skills/
