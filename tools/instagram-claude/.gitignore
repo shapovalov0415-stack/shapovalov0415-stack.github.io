@@ -1,0 +1,6 @@
+# never commit credentials
+*.token
+.env
+.env.*
+__pycache__/
+*.pyc
