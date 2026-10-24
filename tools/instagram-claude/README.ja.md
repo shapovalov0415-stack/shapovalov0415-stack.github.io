@@ -88,6 +88,8 @@
      python3 ig.py token-exchange --out ./ig.token      # 600 で保存、標準出力にはマスク表示のみ
    ```
 6. `./ig.token` の中身を環境変数 `IG_ACCESS_TOKEN` に登録（チャットに貼らない）
+   - あわせて `IG_EXPECT_USERNAME` に自分のユーザーネームを入れておくと、
+     `ig.py whoami` が「別アカウントのトークンだった」ケースを検出して止まる
 7. 60日ごと（24時間以上経過してから）に更新
    ```bash
    python3 ig.py token-refresh --out ./ig.token
@@ -114,6 +116,7 @@ export IG_ACCESS_TOKEN=...          # 環境のシークレットから
 export IG_AUTH_MODE=instagram       # 方式B なら facebook
 
 python3 ig.py whoami                                   # トークンの持ち主を確認
+python3 ig.py whoami --expect <username>               # 想定アカウントと違ったら exit 3（$IG_EXPECT_USERNAME でも可）
 python3 ig.py media --limit 10                         # 直近の投稿
 python3 ig.py top --limit 12                           # 伸びている投稿の分析（エンゲージメント率で並べ替え）
 python3 ig.py insights --metrics views,reach,accounts_engaged

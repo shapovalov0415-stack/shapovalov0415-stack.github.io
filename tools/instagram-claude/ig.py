@@ -172,12 +172,31 @@ def emit(ctx, obj):
 
 # ---- commands -----------------------------------------------------------
 def cmd_whoami(ctx, args):
+    expect = (args.expect or os.environ.get("IG_EXPECT_USERNAME") or "").lstrip("@").lower()
+    found = []
     if ctx.mode == "instagram":
         fields = "user_id,username,account_type,media_count,followers_count,follows_count,profile_picture_url"
-        emit(ctx, ctx.get("me", {"fields": fields}))
+        res = ctx.get("me", {"fields": fields})
+        if res.get("username"):
+            found.append(res["username"])
     else:
-        pages = ctx.get("me/accounts", {"fields": "id,name,instagram_business_account{id,username,followers_count,media_count}"})
-        emit(ctx, pages)
+        res = ctx.get("me/accounts", {"fields": "id,name,instagram_business_account{id,username,followers_count,media_count}"})
+        for page in res.get("data", []):
+            iba = page.get("instagram_business_account") or {}
+            if iba.get("username"):
+                found.append(iba["username"])
+    emit(ctx, res)
+    if expect and not ctx.dry_run:
+        if expect in [f.lstrip("@").lower() for f in found]:
+            print("account check: OK (@%s)" % expect)
+        else:
+            print("account check: MISMATCH - expected @%s, token reaches %s"
+                  % (expect, ", ".join("@" + f for f in found) or "(no account)"), file=sys.stderr)
+            raise SystemExit(3)
+    acct = res.get("account_type")
+    if acct and acct.upper() not in ("BUSINESS", "CREATOR", "MEDIA_CREATOR"):
+        print("warning: account_type is %r - the Instagram API needs a professional "
+              "(Business or Creator) account." % acct, file=sys.stderr)
 
 
 def cmd_media(ctx, args):
@@ -423,7 +442,10 @@ def build_parser():
     p.add_argument("--json", action="store_true", help="(reserved) raw json output")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("whoami", help="show the account the token belongs to").set_defaults(fn=cmd_whoami)
+    w = sub.add_parser("whoami", help="show the account the token belongs to")
+    w.add_argument("--expect", help="username this token must belong to (default: $IG_EXPECT_USERNAME); "
+                                    "exits 3 on mismatch")
+    w.set_defaults(fn=cmd_whoami)
 
     m = sub.add_parser("media", help="list recent media")
     m.add_argument("--limit", type=int, default=10)
