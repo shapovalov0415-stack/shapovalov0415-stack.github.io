@@ -42,12 +42,13 @@
 | 2 | 使えるのは個人アカウントではない | ✅ 正しい | プロアカウント（ビジネス or クリエイター）が必須 |
 | 3 | Meta for Developers でアプリを作る | ✅ 正しい | 手順そのものは現行 |
 | 4 | 「直接連携できるようになりました」 | ⚠️ 誇張 | **Anthropic 公式の Instagram コネクタは確認できない**。実体は「アクセストークンを渡して Claude に Graph API を叩かせる」方式。サードパーティ製 MCP コネクタは多数ある（Metricool / Planoly / Composio など、いずれも非公式） |
-| 5 | グラフAPIエクスプローラーで出したキーをそのまま使う | ⚠️ 不十分 | Explorer のユーザートークンは **約1時間で失効**。`/access_token`（`ig_exchange_token`）で **60日の長期トークン**に交換し、以後 `refresh_access_token` で更新する必要がある |
+| 5 | グラフAPIエクスプローラーで出したキーをそのまま使う | ⚠️ 不十分 | Explorer やビジネスログインのフローで出るトークンは **約1時間で失効**。`/access_token`（`ig_exchange_token`）で **60日の長期トークン**に交換し、以後 `refresh_access_token` で更新する。**例外**：アプリダッシュボードの「Instagramログインによる API設定 → アクセストークンを生成」で出るトークンは**最初から60日の長期トークン**なので、交換は不要（動画の経路より簡単） |
 | 6 | 動画のスコープ構成 | ⚠️ 条件付き | `instagram_basic` 系＝Facebook ログイン方式。**Instagram プロアカウントを Facebook ページに連携**する必要がある。ページ無しで済ませたいなら Instagram ログイン方式（`instagram_business_*` 系, ホストは `graph.instagram.com`） |
 | 7 | （動画は触れていない）他人のアカウントも扱える | ❌ 要App Review | 自分＝アプリに役割があるユーザーのアカウントなら開発モード/Standard Access のままで可。第三者のアカウントを扱うには App Review が必要 |
 | 8 | （動画は触れていない）DM 自動化の制約 | ⚠️ 重要 | 相手から来たメッセージへの返信が基本。**24時間ウィンドウ**などの制約があり、Meta のプラットフォーム規約の対象 |
 | 9 | （動画は触れていない）投稿数の上限 | ⚠️ 重要 | API 経由の投稿は 24時間あたり 50件（Meta ドキュメント内に 50 と 100 の記述ゆれあり）。`ig.py limit` で実測を確認するのが確実 |
 | 10 | （動画は触れていない）指標名の変更 | ⚠️ 重要 | `impressions` / `plays` は 2025年4月以降 `views` に置換済み。古い記事のコードはそのままでは動かない |
+| 11 | （動画は触れていない）方式による機能差 | ⚠️ 重要 | **ハッシュタグ検索は Facebook ログイン方式のみ**。インサイトは 2025年3月以降 Instagram ログイン方式でも利用可（`instagram_business_manage_insights`）。ただしアプリ管理画面には「ハッシュタグやインサイトをトラッキングしたい場合は Facebook ログインに切り替えて」という旧い案内文が残っているので、権限一覧に insights が出るかで判断する |
 
 > 出典は本ファイル末尾。`developers.facebook.com` はこのサンドボックスから直接取得できなかったため、
 > 公式ドキュメントの内容は検索経由の要約で確認した（一次情報での再確認を推奨）。
@@ -82,15 +83,21 @@
    - `instagram_business_content_publish`（投稿する場合）
    - `instagram_business_manage_comments`（コメント取得・返信する場合）
    - `instagram_business_manage_messages`（DM を扱う場合）
-5. 短命トークン（1時間）を取得 → 長期トークン（60日）に交換
-   ```bash
-   IG_ACCESS_TOKEN=<短命トークン> IG_APP_SECRET=<app secret> \
-     python3 ig.py token-exchange --out ./ig.token      # 600 で保存、標準出力にはマスク表示のみ
-   ```
+   - `instagram_business_manage_insights`（インサイト＝伸びている投稿の分析をする場合）
+5. トークンを生成する。**順番が重要：権限を全部そろえてから生成する**
+   （トークンには生成時点の権限が焼き込まれるため、後から権限を足したらトークンを作り直す）
+   - **簡単な方（推奨）**：「Instagram ログインによる API 設定」→「2. アクセストークンを生成する」→
+     対象アカウントの「トークンを生成」。ここで出るトークンは**最初から60日有効**なので交換は不要
+   - **ビジネスログインのフローで取った場合**：1時間で失効するので交換する
+     ```bash
+     IG_ACCESS_TOKEN=<短命トークン> IG_APP_SECRET=<app secret> \
+       python3 ig.py token-exchange --out ./ig.token    # 600 で保存、標準出力にはマスク表示のみ
+     ```
 6. `./ig.token` の中身を環境変数 `IG_ACCESS_TOKEN` に登録（チャットに貼らない）
    - あわせて `IG_EXPECT_USERNAME` に自分のユーザーネームを入れておくと、
      `ig.py whoami` が「別アカウントのトークンだった」ケースを検出して止まる
-7. 60日ごと（24時間以上経過してから）に更新
+7. 自分のアカウントだけを扱うなら **App Review は不要**（Standard Access の範囲。アプリに登録した、自分が所有・管理するプロアカウントが対象）
+8. 60日ごと（24時間以上経過してから）に更新
    ```bash
    python3 ig.py token-refresh --out ./ig.token
    ```
